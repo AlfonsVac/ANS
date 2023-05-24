@@ -12,6 +12,7 @@ import json
 
 from models.vgg16 import vgg16
 from models.tiny_yolo import tinyYolo
+from models.vc.vc_torch import vc
 from keyFrameDetection import KeyFrameDetection
 from communication import clientCommunication
 from muLinUCB import muLinUCB
@@ -19,30 +20,30 @@ from yolo_utils import load_class_names, get_boxes, plot_boxes_cv2
 
 WINDOW_NAME = 'CameraDemo'
 
-vgg_info = { # action No. : [layer type num{1: conv, 2: fc, 3: act}, total mac{1: conv, 2: fc, 3: act}, mid_data_size, partition point]
-                0: [13, 3, 24, 15346630656, 123633664, 26208256, 4818272, 0],
-                1: [12, 3, 23, 15259926528, 123633664, 22996992, 102761824, 1],
-                2: [11, 3, 22, 13410238464, 123633664, 19785728, 102761824, 2],
-                3: [11, 3, 21, 13410238464, 123633664, 16574464, 25691488, 3],
-                4: [10, 3, 20, 12485394432, 123633664, 13363200, 51381600, 4],
-                5: [9, 3, 19, 10635706368, 123633664, 10151936, 51381600, 5],
-                6: [9, 3, 18, 10635706368, 123633664, 8546304, 12846432, 6],
-                7: [8, 3, 17, 9710862336, 123633664, 6940672, 25691496, 7],
-                8: [7, 3, 16, 7861174272, 123633664, 5335040, 25691496, 8],
-                9: [6, 3, 15, 6011486208, 123633664, 4532224, 25691496, 9],
-                10: [6, 3, 14, 6011486208, 123633664, 3729408, 6423912, 10],
-                11: [5, 3, 13, 5086642176, 123633664, 2926592, 12846440, 11],
-                12: [4, 3, 12, 3236954112, 123633664, 2123776, 12846440, 12],
-                13: [3, 3, 11, 1387266048, 123633664, 1320960, 12846440, 13],
-                14: [3, 3, 10, 1387266048, 123633664, 919552, 3212648, 14],
-                15: [2, 3, 9, 924844032, 123633664, 518144, 3212648, 15],
-                16: [1, 3, 8, 462422016, 123633664, 417792, 3212648, 16],
-                17: [0, 3, 7, 0, 123633664, 317440, 3212648, 17],
-                18: [0, 3, 6, 0, 123633664, 217088, 3212648, 18],
-                19: [0, 3, 4, 0, 123633664, 16384, 804200, 19],
-                20: [0, 2, 2, 0, 20873216, 12288, 804200, 20],
-                21: [0, 1, 0, 0, 4096000, 0, 132416, 21],
-                22: [0, 0, 0, 0, 0, 0, 0, 22]
+vgg_info = { # action No. : [layer, type num{1: conv, 2: fc, 3: act}, total, mac{1: conv, 2: fc, 3: act}, mid_data_size, partition point]
+                0: [13, 3,  24,     15346630656,    123633664,  26208256,   4818272,        0],
+                1: [12, 3,  23,     15259926528,    123633664,  22996992,   102761824,      1],
+                2: [11, 3,  22,     13410238464,    123633664,  19785728,   102761824,      2],
+                3: [11, 3,  21,     13410238464,    123633664,  16574464,   25691488,       3],
+                4: [10, 3,  20,     12485394432,    123633664,  13363200,   51381600,       4],
+                5: [9,  3,  19,     10635706368,    123633664,  10151936,   51381600,       5],
+                6: [9,  3,  18,     10635706368,    123633664,  8546304,    12846432,       6],
+                7: [8,  3,  17,     9710862336,     123633664,  6940672,    25691496,       7],
+                8: [7,  3,  16,     7861174272,     123633664,  5335040,    25691496,       8],
+                9: [6,  3,  15,     6011486208,     123633664,  4532224,    25691496,       9],
+                10: [6, 3,  14,     6011486208,     123633664,  3729408,    6423912,        10],
+                11: [5, 3,  13,     5086642176,     123633664,  2926592,    12846440,       11],
+                12: [4, 3,  12,     3236954112,     123633664,  2123776,    12846440,       12],
+                13: [3, 3,  11,     1387266048,     123633664,  1320960,    12846440,       13],
+                14: [3, 3,  10,     1387266048,     123633664,  919552,     3212648,        14],
+                15: [2, 3,  9,      924844032,      123633664,  518144,     3212648,        15],
+                16: [1, 3,  8,      462422016,      123633664,  417792,     3212648,        16],
+                17: [0, 3,  7,      0,              123633664,  317440,     3212648,        17],
+                18: [0, 3,  6,      0,              123633664,  217088,     3212648,        18],
+                19: [0, 3,  4,      0,              123633664,  16384,      804200,         19],
+                20: [0, 2,  2,      0,              20873216,   12288,      804200,         20],
+                21: [0, 1,  0,      0,              4096000,    0,          132416,         21],
+                22: [0, 0,  0,      0,              0,          0,          0,              22]
                 }
 
 yolo_info = {
@@ -80,6 +81,14 @@ yolo_info = {
                 31: [0, 0, 0, 0, 0, 0, 0, 31]
                 }
 
+vc_info = { # action No. : [layer, type num{1: conv, 2: fc, 3: act}, total, mac{1: conv, 2: fc, 3: act}, mid_data_size, partition point]
+                0: [5, 13,  5,        20275200,      3707200,    110692,       84736,       0],
+                1: [4, 13,  4,        14745600,      3707200,     36964,     2359296,       1],
+                2: [3, 23,  3,               0,      3707200,     18532,      589824,       2],
+                3: [2, 23,  2,               0,        20800,       100,        3200,       3],
+                4: [1, 23,  1,               0,          800,         0,        3200,       4],
+                5: [0,  1,  0,               0,            0,         0,           0,       5]
+}
 
 def parse_args():
     # Parse input arguments
@@ -107,7 +116,7 @@ def parse_args():
                         help='image height',
                         default=480, type=int)
     parser.add_argument('--dnn', dest='dnn_model',
-                        help='vgg, yolo',
+                        help='vgg, yolo, vc',
                         default='yolo', type=str)
     parser.add_argument('--host', dest='host',
                         help='Ip address',
@@ -132,11 +141,13 @@ def open_cam_rtsp(uri, width, height, latency):
 def open_cam_usb(dev, width, height):
     # We want to set width and height here, otherwise we could just do:
     #     return cv2.VideoCapture(dev)
-    gst_str = ('v4l2src device=/dev/video{} ! '
-               'video/x-raw, width=(int){}, height=(int){} ! '
-               'videoconvert ! appsink').format(dev, width, height)
-    return cv2.VideoCapture(gst_str, cv2.CAP_GSTREAMER)
-
+    #gst_str = ('v4l2src device=/dev/video{} ! '
+    #           'video/x-raw, width=(int){}, height=(int){} ! '
+    #           'videoconvert ! appsink').format(dev, width, height)
+    #return cv2.VideoCapture(gst_str, cv2.CAP_GSTREAMER)
+    cap = cv2.VideoCapture(0)
+    #cap = cv2.VideoCapture("/dev/video0", cv2.CAP_V4L2)
+    return cap
 
 def open_cam_onboard(width, height):
     gst_elements = str(subprocess.check_output('gst-inspect-1.0'))
@@ -182,6 +193,20 @@ def prepare_image_vgg(frame):
     img = img.unsqueeze(0)
     return img
 
+def prepare_image_vc(frame):
+    min_img_size = 96
+    transform_pipeline = transforms.Compose([transforms.Resize((min_img_size, min_img_size)),
+                                             transforms.ToTensor(),
+                                             transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                  std=[0.229, 0.224, 0.225])])
+
+    img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    img = Image.fromarray(img_rgb)
+    img = transform_pipeline(img)
+    img = img.unsqueeze(0)
+    return img
+
+
 def prepare_image_yolo(frame):
     min_img_size = 416
     image = cv2.resize(frame, (min_img_size, min_img_size), interpolation=cv2.INTER_CUBIC)
@@ -216,10 +241,10 @@ def decodePrediction_vgg(res, labels):
 
 def getActualDelay(action, model, preprocessed_image, totallayerNo, communication):
     if action == totallayerNo - 1: # local mobile process
-        prediction = model(preprocessed_image.cuda())
+        prediction = model(preprocessed_image.to(device))
         return 0, prediction.item()
     else:
-        intermediate_output = model(preprocessed_image.cuda(), server=False, partition=action)
+        intermediate_output = model(preprocessed_image.to(device), server=False, partition=action)
 
     data_to_server = [action, intermediate_output.data]
     del intermediate_output
@@ -233,10 +258,16 @@ def getActualDelay(action, model, preprocessed_image, totallayerNo, communicatio
     end_time = time.time()
 
     return end_time - start_time,  result
+    
+class CPU_Unpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
+        else: return super().find_class(module, name)
 
 def load_obj(name):
     with open(name + '.pkl', 'rb') as f:
-        return pickle.load(f)
+        return pickle.load(f)#CPU_Unpickler(f).load()# pickle.load(f)
 
 if __name__ == '__main__':
     args = parse_args()
@@ -244,20 +275,28 @@ if __name__ == '__main__':
     print(args)
     print('OpenCV version: {}'.format(cv2.__version__))
 
+    device = torch.device("cpu")
+
     if args.dnn_model == 'vgg':
         model = vgg16()
         model.eval()
-        frontEndDelay = load_obj('models/vgg16FrontEndDelay')
-        labels = getVggLabelDic('models/imagenet_class_index.json')
+        frontEndDelay = load_obj('models\\vgg16FrontEndDelay')
+        #print(frontEndDelay)
+        labels = getVggLabelDic('models\\imagenet_class_index.json')
         partitionInfo = vgg_info
+    elif args.dnn_model == 'vc':
+        model = vc()
+        model.eval()
+        frontEndDelay = load_obj('models\\vcFrontEndDelay')
+        partitionInfo = vc_info
     else:
         model = tinyYolo()
         model.eval()
-        frontEndDelay = load_obj('models/yoloFrontEndDelay')
-        labels = load_class_names('models/voc.names')
+        frontEndDelay = load_obj('models\\yoloFrontEndDelay')
+        labels = load_class_names('models\\voc.names')
         partitionInfo = yolo_info
 
-    model.cuda()
+    model.to(torch.device("cpu"))
     Action_num = len(partitionInfo)
 
     muLinUCB = muLinUCB(mu=0.25, layerInfo=partitionInfo, frontDelay=frontEndDelay)
@@ -282,8 +321,9 @@ if __name__ == '__main__':
     open_window(args.image_width, args.image_height)
 
     show_help = True
+    show_message = False
     full_scrn = False
-    help_text = '"Esc" to Quit, "H" for Help, "F" to Toggle Fullscreen'
+    help_text = '"Esc" to Quit, "H" for Help, "F" to Toggle Fullscreen, "M" to log'
     font = cv2.FONT_HERSHEY_PLAIN
 
     total_time = 0
@@ -301,6 +341,8 @@ if __name__ == '__main__':
 
         if args.dnn_model == 'vgg':
             preprocessed_image = prepare_image_vgg(img)
+        elif args.dnn_model == 'vc':
+            preprocessed_image = prepare_image_vc(img)
         else:
             preprocessed_image = prepare_image_yolo(img)
 
@@ -314,16 +356,19 @@ if __name__ == '__main__':
             keyflag = False
             old_frame = np.copy(img)
         else:
-            keyflag = KeyFrame.compare_images(old_frame, img)
+            keyflag = KeyFrame.compare_images(old_frame, img) #type ignore
             old_frame = np.copy(img)
 
         # print('keyflag', keyflag)
 
         partitionPoint = muLinUCB.getEstimationAction(keyflag, currentFrameNum)
-        # print('partitionPoint', partitionPoint)
+        #partitionPoint = 1
+        if show_message:
+            print('partitionPoint', partitionPoint)
 
         end2endtime_start = time.time()
         actual_delay, res = getActualDelay(partitionPoint, model, preprocessed_image, Action_num, communication)
+        #print('actual delay', actual_delay)
 
         end2endtime_end = time.time()
 
@@ -333,10 +378,14 @@ if __name__ == '__main__':
 
         # update A and b
         muLinUCB.updateA_b(partitionPoint, actual_delay)
+        #print('partitionPoint', partitionPoint)
 
         # print results on  the screen
         if args.dnn_model == 'vgg':
             label = decodePrediction_vgg(res, labels)
+            img = show_preds(img, label, average_time)
+        elif args.dnn_model == 'vc':
+            label = str(res)
             img = show_preds(img, label, average_time)
         else:
             boxes = get_boxes(res, model, conf_thresh=0.5, nms_thresh=0.5)
@@ -355,6 +404,10 @@ if __name__ == '__main__':
             break
         elif key == ord('H') or key == ord('h'): # toggle help message
             show_help = not show_help
+        elif key == ord('M') or key == ord('m'): #toggle devision message
+            show_message = not show_message
+        elif key == ord('P') or key == ord('p'): #print devision table
+             print(partitionInfo)
         elif key == ord('F') or key == ord('f'): # toggle fullscreen
             full_scrn = not full_scrn
             if full_scrn:

@@ -30,6 +30,7 @@ class muLinUCB():
     def __init__(self, mu, layerInfo, frontDelay):
         self.mu = mu
         self.numOfAction = len(layerInfo)
+        #print(layerInfo, 'tak', len(layerInfo))
         self.thetaContextDim = 7
         self.x_theta, self.actionList = fillThetaContext(layerInfo, self.thetaContextDim)
         self.C_x = getCx(self.x_theta, self.numOfAction)

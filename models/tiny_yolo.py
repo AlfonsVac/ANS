@@ -372,7 +372,7 @@ class TinyYoloNet(nn.Module):
 def tinyYolo():
     m = TinyYoloNet()
     m.float()
-    m.load_weights('C:/Users/zhang/PycharmProjects/WorkBoard/partirion_inference/models/yolov2-tiny-voc.weights')
+    m.load_weights('/home/odroid/ANS/models/yolov2-tiny-voc.weights')
     return m
 
 
@@ -384,9 +384,10 @@ if __name__ == '__main__':
     m.eval()
     # print(m)
     
-    use_cuda = 1
+    use_cuda = 0
     if use_cuda:
         m.cuda()
+    m.to(torch.device("cpu"))
 
     img = Image.open('Golden_Retriever_Hund_Dog.jpg').convert('RGB')
     sized = img.resize((416, 416))

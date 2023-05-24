@@ -124,15 +124,15 @@ def get_region_boxes(output, conf_thresh, num_classes, anchors, num_anchors, onl
     all_boxes = []
     output = output.view(int(batch*num_anchors), int(5+num_classes), int(h*w)).transpose(0, 1).contiguous().view(int(5+num_classes), int(batch*num_anchors*h*w))
 
-    grid_x = torch.linspace(0, w-1, w).repeat(h,1).repeat(int(batch*num_anchors), 1, 1).view(int(batch*num_anchors*h*w)).cuda()
-    grid_y = torch.linspace(0, h-1, h).repeat(w,1).t().repeat(int(batch*num_anchors), 1, 1).view(int(batch*num_anchors*h*w)).cuda()
+    grid_x = torch.linspace(0, w-1, w).repeat(h,1).repeat(int(batch*num_anchors), 1, 1).view(int(batch*num_anchors*h*w))#.cuda()
+    grid_y = torch.linspace(0, h-1, h).repeat(w,1).t().repeat(int(batch*num_anchors), 1, 1).view(int(batch*num_anchors*h*w))#.cuda()
     xs = torch.sigmoid(output[0]) + grid_x
     ys = torch.sigmoid(output[1]) + grid_y
 
     anchor_w = torch.Tensor(anchors).view(num_anchors, anchor_step).index_select(1, torch.LongTensor([0]))
     anchor_h = torch.Tensor(anchors).view(num_anchors, anchor_step).index_select(1, torch.LongTensor([1]))
-    anchor_w = anchor_w.repeat(batch, 1).repeat(1, 1, h*w).view(batch*num_anchors*h*w).cuda()
-    anchor_h = anchor_h.repeat(batch, 1).repeat(1, 1, h*w).view(batch*num_anchors*h*w).cuda()
+    anchor_w = anchor_w.repeat(batch, 1).repeat(1, 1, h*w).view(batch*num_anchors*h*w)#.cuda()
+    anchor_h = anchor_h.repeat(batch, 1).repeat(1, 1, h*w).view(batch*num_anchors*h*w)#.cuda()
     ws = torch.exp(output[2]) * anchor_w
     hs = torch.exp(output[3]) * anchor_h
 
@@ -317,7 +317,7 @@ def partirion_output(model, img, action):
     img = torch.from_numpy(img.transpose(2,0,1)).float().div(255.0).unsqueeze(0)
     img = Variable(img)
     with torch.no_grad():
-        output = model(img.cuda(), mode=action, client=True)
+        output = model(img, mode=action, client=True)#(img.cuda(), mode=action, client=True)
         output = output.data
         del img
     return output
@@ -330,7 +330,7 @@ def get_boxes(res, model, conf_thresh, nms_thresh):
 
     return boxes
 
-def do_detect(model, img, conf_thresh, nms_thresh, use_cuda=1):
+def do_detect(model, img, conf_thresh, nms_thresh, use_cuda=0):
     model.eval()
     t0 = time.time()
 
@@ -348,9 +348,9 @@ def do_detect(model, img, conf_thresh, nms_thresh, use_cuda=1):
         exit(-1)
 
     t1 = time.time()
-
-    if use_cuda:
+    if 0:
         img = img.cuda()
+    
     img = torch.autograd.Variable(img)
     t2 = time.time()
 

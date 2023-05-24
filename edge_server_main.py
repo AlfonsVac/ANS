@@ -7,18 +7,19 @@ from PIL import Image
 
 from models.vgg16 import vgg16
 from models.tiny_yolo import tinyYolo
+from models.vc.vc_torch import vc
 from communication import serverCommunication
 
 
 WINDOW_NAME = 'CameraDemo'
-
+device = torch.device("cpu")
 
 def parse_args():
     # Parse input arguments
     desc = 'ANS in edge server side'
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument('--dnn', dest='dnn_model',
-                        help='vgg, yolo',
+                        help='vgg, yolo, vc',
                         default='yolo', type=str)
     parser.add_argument('--host', dest='host',
                         help='Ip address',
@@ -38,11 +39,14 @@ if __name__ == '__main__':
     if args.dnn_model == 'vgg':
         model = vgg16()
         model.eval()
+    elif args.dnn_model == 'vc':
+        model = vc()
+        model.eval()
     else:
         model = tinyYolo()
         model.eval()
 
-    model.cuda()
+    model.to(device)
 
     communication = serverCommunication(args.host, args.port)
 
@@ -55,7 +59,7 @@ if __name__ == '__main__':
                 partition_point = recv_data[0]
                 data = recv_data[1]
                 data = torch.autograd.Variable(data)
-                prediction = model(data.cuda(), server=True, partition=partition_point)
+                prediction = model(data.to(device), server=True, partition=partition_point)
                 res = prediction.data
 
                 msg = communication.send_msg(conn, res)

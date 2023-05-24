@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+import time
 
 __all__ = ['Vgg16', 'vgg16']
 
@@ -10,7 +11,7 @@ class Vgg16(nn.Module):
             nn.Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)), # 0
             nn.ReLU(inplace=True), # 1
             nn.Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)), # 2
-            nn.ReLU(inplace=True), # 30
+            nn.ReLU(inplace=True), # 3
             nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False), # 4
             nn.Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)), # 5
             nn.ReLU(inplace=True), # 6
@@ -218,6 +219,7 @@ class Vgg16(nn.Module):
                 x = self.avgpool(x)
                 x = torch.flatten(x, 1)
                 x = self.classifier(x)
+            #print(x.shape)
         return x
 
     def _initialize_weights(self):
@@ -250,7 +252,7 @@ if __name__ == '__main__':
     import torchvision.transforms as transforms
     from PIL import Image
 
-    with open("imagenet_class_index.json", "r") as read_file:
+    with open("models\\imagenet_class_index.json", "r") as read_file:
         class_idx = json.load(read_file)
         labels = {int(key): value for key, value in class_idx.items()}
 
@@ -258,6 +260,7 @@ if __name__ == '__main__':
     model.eval()
     if torch.cuda.is_available():
         model.cuda()
+    model.to(torch.device("cpu"))
 
     min_img_size = 224
     transform_pipeline = transforms.Compose([transforms.Resize((min_img_size, min_img_size)),
@@ -265,15 +268,18 @@ if __name__ == '__main__':
                                              transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                                   std=[0.229, 0.224, 0.225])])
 
-    img = Image.open('Golden_Retriever_Hund_Dog.jpg')
+    img = Image.open('models\\Golden_Retriever_Hund_Dog.jpg')
     img = transform_pipeline(img)
     img = img.unsqueeze(0)
-
+    times = []
     for partition in range(23):
         with torch.no_grad():
-            intermediate = model(img.cuda(), server=False, partition=partition)
+            start = time.time()
+            intermediate = model(img, server=False, partition=partition)
+            end = time.time()
             prediction = model(intermediate, server=True, partition=partition)
-
+            times.append(end-start)
             prediction = torch.argmax(prediction)
 
             print('partition point ', partition, labels[prediction.item()])
+    print(times)
