@@ -11,98 +11,55 @@ class vc(nn.Module):
 
         self.init_weights()
 
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=5, stride=(1, 1), padding='same', bias=False, dilation=1)
-        self.conv1.weight.data = self.w1
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=5, stride=(1, 1), padding='same', bias=False, dilation=1)
-        self.conv2.weight.data = self.w2
+        self.conv1 = torch.nn.Conv2d(in_channels=3, out_channels=32, kernel_size=(5, 5), stride=1, padding='same', bias=False) #3, 32, 5, 1, 0, bias=False)
+        self.conv1.weight = torch.nn.Parameter(self.w1)
+        self.max_pool2d1 = torch.nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        self.conv2 = torch.nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(5, 5), stride=1, padding='same', bias=False) #3, 32, 5, 1, 0, bias=False)
+        self.conv2.weight = torch.nn.Parameter(self.w2)
+        self.max_pool2d2 = torch.nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
 
     def forward(self, x, server=True, partition=0):
         if server == True:
-            if partition in range(6):
-                x = self.networkrun_server(x, partition)
-            else:
-                print('Please give the right partition point.')
+            if partition == 0:
+                #first part
+                x = self.max_pool2d1(F.relu(self.conv1(x)))
+            if partition <= 1:
+                #second part
+                x = self.max_pool2d2(F.relu(self.conv2(x)))
+            if partition <= 2:
+                #reshape + third part
+                x = torch.reshape(torch.t(torch.reshape(torch.reshape(x.permute(0,2,3,1),[24,24,32]),[24*24,32])), [1, 24*24*32])
+                x = torch.matmul(x, self.W_d1)
+            if partition <= 3:
+                #fourth part
+                x = F.relu(torch.matmul(F.relu(x), self.W_d2))
+                x = torch.matmul(x, self.W_out)
+            #if partition <= 4: nothing
         else:
-            if partition in range(6):
-                x = self.networkrun_client(x, partition)
-            else:
-                print('Please give the right partition point.')
-        return x
-
-    def networkrun_server(self, x, partition = 0):
-        if partition == 0:
-            x = F.relu(self.conv1(x))
-            x = F.max_pool2d(x, kernel_size=2, stride=2, padding=0, ceil_mode=False)
-            x = F.relu(self.conv2(x))
-            x = F.max_pool2d(x, kernel_size=2, stride=2, padding=0, ceil_mode=False)
-            #print(x.shape)
-            x = x.reshape(32, 24 * 24).t().reshape(1, 32 * 24 * 24)
-            x = F.relu(torch.matmul(x, self.W_d1))
-            x = F.relu(torch.matmul(x, self.W_d2))
-            x = torch.matmul(x, self.W_out)
-        if partition == 1:
-            x = F.relu(self.conv2(x))
-            x = F.max_pool2d(x, kernel_size=2, stride=2, padding=0, ceil_mode=False)
-            x = x.reshape(32, 24 * 24).t().reshape(1, 32 * 24 * 24)
-            x = F.relu(torch.matmul(x, self.W_d1))
-            x = F.relu(torch.matmul(x, self.W_d2))
-            x = torch.matmul(x, self.W_out)
-        if partition == 2:
-            x = x.reshape(32, 24 * 24).t().reshape(1, 32 * 24 * 24)
-            x = F.relu(torch.matmul(x, self.W_d1))
-            x = F.relu(torch.matmul(x, self.W_d2))
-            x = torch.matmul(x, self.W_out)
-        if partition == 3:
-            x = F.relu(torch.matmul(x, self.W_d2))
-            x = torch.matmul(x, self.W_out)
-        if partition == 4:
-            x = torch.matmul(x, self.W_out)
-
+            if partition == 0:
+                # do nothing
+                return x
+            if partition >= 1:
+                #first part
+                x = self.max_pool2d1(F.relu(self.conv1(x)))
+            if partition >= 2:
+                #second part
+                x = self.max_pool2d2(F.relu(self.conv2(x)))
+            if partition >= 3:
+                #reshape + third part
+                x = torch.reshape(torch.t(torch.reshape(torch.reshape(x.permute(0,2,3,1),[24,24,32]),[24*24,32])), [1, 24*24*32])
+                x = torch.matmul(x, self.W_d1)
+            if partition >= 4:
+                #fourth part
+                x = F.relu(torch.matmul(F.relu(x), self.W_d2))
+                x = torch.matmul(x, self.W_out)
         return x
     
-    def networkrun_client(self, x, partition = 0):
-        if partition == 1:
-            x = F.relu(self.conv1(x))
-            x = F.max_pool2d(x, kernel_size=2, stride=2, padding=0, ceil_mode=False)
-        if partition == 2:
-            x = F.relu(self.conv1(x))
-            x = F.max_pool2d(x, kernel_size=2, stride=2, padding=0, ceil_mode=False)
-            x = F.relu(self.conv2(x))
-            x = F.max_pool2d(x, kernel_size=2, stride=2, padding=0, ceil_mode=False)
-        if partition == 3:
-            x = F.relu(self.conv1(x))
-            x = F.max_pool2d(x, kernel_size=2, stride=2, padding=0, ceil_mode=False)
-            x = F.relu(self.conv2(x))
-            x = F.max_pool2d(x, kernel_size=2, stride=2, padding=0, ceil_mode=False)
-            x = x.reshape(32, 24 * 24).t().reshape(1, 32 * 24 * 24)
-            #print(x.shape, '    after reshape')
-            x = F.relu(torch.matmul(x, self.W_d1))
-        if partition == 4:
-            x = F.relu(self.conv1(x))
-            x = F.max_pool2d(x, kernel_size=2, stride=2, padding=0, ceil_mode=False)
-            x = F.relu(self.conv2(x))
-            x = F.max_pool2d(x, kernel_size=2, stride=2, padding=0, ceil_mode=False)
-            x = x.reshape(32, 24 * 24).t().reshape(1, 32 * 24 * 24)
-            x = F.relu(torch.matmul(x, self.W_d1))
-            x = F.relu(torch.matmul(x, self.W_d2))
-        if partition == 5:
-            x = F.relu(self.conv1(x))
-            x = F.max_pool2d(x, kernel_size=2, stride=2, padding=0, ceil_mode=False)
-            x = F.relu(self.conv2(x))
-            x = F.max_pool2d(x, kernel_size=2, stride=2, padding=0, ceil_mode=False)
-            x = x.reshape(32, 24 * 24).t().reshape(1, 32 * 24 * 24)
-            x = F.relu(torch.matmul(x, self.W_d1))
-            x = F.relu(torch.matmul(x, self.W_d2))
-            x = torch.matmul(x, self.W_out)
-
-        #print(x.shape)
-        return x
-
     def init_weights(self):
         # Load weights
-        self.w1 = torch.from_numpy(self.readRaw4D( 'models\\vc\\parameter\\conv1_update.bin', [5,5,3,32]))
+        self.w1 = torch.tensor(self.readRaw4D( 'models\\vc\\parameter\\conv1_update.bin', [5,5,3,32]), dtype=torch.float)
         #print(w1.shape)
-        self.w2 = torch.from_numpy(self.readRaw4D('models\\vc\\parameter\\conv2_update.bin', [5,5,32,32]))
+        self.w2 = torch.tensor(self.readRaw4D('models\\vc\\parameter\\conv2_update.bin', [5,5,32,32]), dtype=torch.float)
         #print(w2.shape)
         self.W_d1 = torch.from_numpy(self.readRaw2D('models\\vc\\parameter\\ip3.bin', [24*24*32, 100]))
         self.W_d2 = torch.from_numpy(self.readRaw2D('models\\vc\\parameter\\ip4.bin', [100, 100]))
@@ -178,7 +135,7 @@ if __name__ == '__main__':
                                              transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                                   std=[0.229, 0.224, 0.225])])
 
-    if 0:
+    if 1:
         img = Image.open('models\\Golden_Retriever_Hund_Dog.jpg')
         img = transform_pipeline(img)
         img = img.unsqueeze(0)
@@ -190,8 +147,9 @@ if __name__ == '__main__':
         with torch.no_grad():
             start = time.time()
             intermediate = model(img, server=False, partition=partition)
+            print(intermediate.shape)
             end = time.time()
             prediction = model(intermediate, server=True, partition=partition)
             times.append(end - start)
-            print('partition point ', partition, str(prediction))
+            #print('partition point ', partition, '  result:', np.round(torch.softmax(prediction, 1).clone().detach().numpy()))
     print(times)

@@ -84,10 +84,9 @@ yolo_info = {
 vc_info = { # action No. : [layer, type num{1: conv, 2: fc, 3: act}, total, mac{1: conv, 2: fc, 3: act}, mid_data_size, partition point]
                 0: [5, 13,  5,        20275200,      3707200,    110692,       84736,       0],
                 1: [4, 13,  4,        14745600,      3707200,     36964,     2359296,       1],
-                2: [3, 23,  3,               0,      3707200,     18532,      589824,       2],
-                3: [2, 23,  2,               0,        20800,       100,        3200,       3],
-                4: [1, 23,  1,               0,          800,         0,        3200,       4],
-                5: [0,  1,  0,               0,            0,         0,           0,       5]
+                2: [3, 23,  3,               0,      3707200,         0,      589824,       2],
+                3: [2, 23,  2,               0,        20800,     18532,        3200,       3],
+                4: [1, 23,  1,               0,          800,         0,         128,       4],
 }
 
 def parse_args():
@@ -239,9 +238,15 @@ def decodePrediction_vgg(res, labels):
     label_index = torch.argmax(res).item()
     return labels[label_index]
 
+def decodePrediction_vc(res):
+
+    return [str(res), str(res)]
+
 def getActualDelay(action, model, preprocessed_image, totallayerNo, communication):
     if action == totallayerNo - 1: # local mobile process
         prediction = model(preprocessed_image.to(device))
+        if args.dnn_model == 'vc':
+            return 0, np.round(torch.softmax(prediction, 1).detach().numpy())
         return 0, prediction.item()
     else:
         intermediate_output = model(preprocessed_image.to(device), server=False, partition=action)
@@ -256,7 +261,8 @@ def getActualDelay(action, model, preprocessed_image, totallayerNo, communicatio
 
     communication.close_channel()
     end_time = time.time()
-
+    if args.dnn_model == 'vc':
+            return end_time - start_time, np.round(torch.softmax(result, 1).detach().numpy())
     return end_time - start_time,  result
     
 class CPU_Unpickler(pickle.Unpickler):
@@ -299,7 +305,7 @@ if __name__ == '__main__':
     model.to(torch.device("cpu"))
     Action_num = len(partitionInfo)
 
-    muLinUCB = muLinUCB(mu=0.25, layerInfo=partitionInfo, frontDelay=frontEndDelay)
+    muLinUCB = muLinUCB(mu=0.5, layerInfo=partitionInfo, frontDelay=frontEndDelay)
     communication = clientCommunication(args.host, args.port)
 
     if args.use_rtsp:
@@ -385,7 +391,7 @@ if __name__ == '__main__':
             label = decodePrediction_vgg(res, labels)
             img = show_preds(img, label, average_time)
         elif args.dnn_model == 'vc':
-            label = str(res)
+            label = decodePrediction_vc(res)
             img = show_preds(img, label, average_time)
         else:
             boxes = get_boxes(res, model, conf_thresh=0.5, nms_thresh=0.5)

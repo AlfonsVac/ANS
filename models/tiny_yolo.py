@@ -227,19 +227,19 @@ class RegionLoss(nn.Module):
         nW = output.data.size(3)
 
         output   = output.view(nB, nA, (5+nC), nH, nW)
-        x    = F.sigmoid(output.index_select(2, Variable(torch.cuda.LongTensor([0]))).view(nB, nA, nH, nW))
-        y    = F.sigmoid(output.index_select(2, Variable(torch.cuda.LongTensor([1]))).view(nB, nA, nH, nW))
-        w    = output.index_select(2, Variable(torch.cuda.LongTensor([2]))).view(nB, nA, nH, nW)
-        h    = output.index_select(2, Variable(torch.cuda.LongTensor([3]))).view(nB, nA, nH, nW)
-        conf = F.sigmoid(output.index_select(2, Variable(torch.cuda.LongTensor([4]))).view(nB, nA, nH, nW))
-        cls  = output.index_select(2, Variable(torch.linspace(5,5+nC-1,nC).long().cuda()))
+        x    = F.sigmoid(output.index_select(2, Variable(torch.LongTensor([0]))).view(nB, nA, nH, nW))
+        y    = F.sigmoid(output.index_select(2, Variable(torch.LongTensor([1]))).view(nB, nA, nH, nW))
+        w    = output.index_select(2, Variable(torch.LongTensor([2]))).view(nB, nA, nH, nW)
+        h    = output.index_select(2, Variable(torch.LongTensor([3]))).view(nB, nA, nH, nW)
+        conf = F.sigmoid(output.index_select(2, Variable(torch.LongTensor([4]))).view(nB, nA, nH, nW))
+        cls  = output.index_select(2, Variable(torch.linspace(5,5+nC-1,nC).long()))
         cls  = cls.view(nB*nA, nC, nH*nW).transpose(1,2).contiguous().view(nB*nA*nH*nW, nC)
 
-        pred_boxes = torch.cuda.FloatTensor(4, nB*nA*nH*nW)
-        grid_x = torch.linspace(0, nW-1, nW).repeat(nH,1).repeat(nB*nA, 1, 1).view(nB*nA*nH*nW).cuda()
-        grid_y = torch.linspace(0, nH-1, nH).repeat(nW,1).t().repeat(nB*nA, 1, 1).view(nB*nA*nH*nW).cuda()
-        anchor_w = torch.Tensor(self.anchors).view(nA, self.anchor_step).index_select(1, torch.LongTensor([0])).cuda()
-        anchor_h = torch.Tensor(self.anchors).view(nA, self.anchor_step).index_select(1, torch.LongTensor([1])).cuda()
+        pred_boxes = torch.FloatTensor(4, nB*nA*nH*nW)
+        grid_x = torch.linspace(0, nW-1, nW).repeat(nH,1).repeat(nB*nA, 1, 1).view(nB*nA*nH*nW)
+        grid_y = torch.linspace(0, nH-1, nH).repeat(nW,1).t().repeat(nB*nA, 1, 1).view(nB*nA*nH*nW)
+        anchor_w = torch.Tensor(self.anchors).view(nA, self.anchor_step).index_select(1, torch.LongTensor([0])) # type: ignore
+        anchor_h = torch.Tensor(self.anchors).view(nA, self.anchor_step).index_select(1, torch.LongTensor([1])) # type: ignore
         anchor_w = anchor_w.repeat(nB, 1).repeat(1, 1, nH*nW).view(nB*nA*nH*nW)
         anchor_h = anchor_h.repeat(nB, 1).repeat(1, 1, nH*nW).view(nB*nA*nH*nW)
         pred_boxes[0] = x.data + grid_x
@@ -253,16 +253,16 @@ class RegionLoss(nn.Module):
         cls_mask = (cls_mask == 1)
         nProposals = int((conf > 0.25).sum().data[0])
 
-        tx    = Variable(tx.cuda())
-        ty    = Variable(ty.cuda())
-        tw    = Variable(tw.cuda())
-        th    = Variable(th.cuda())
-        tconf = Variable(tconf.cuda())
-        tcls  = Variable(tcls.view(-1)[cls_mask].long().cuda())
+        tx    = Variable(tx)
+        ty    = Variable(ty)
+        tw    = Variable(tw)
+        th    = Variable(th)
+        tconf = Variable(tconf)
+        tcls  = Variable(tcls.view(-1)[cls_mask].long())
 
-        coord_mask = Variable(coord_mask.cuda())
-        conf_mask  = Variable(conf_mask.cuda().sqrt())
-        cls_mask   = Variable(cls_mask.view(-1, 1).repeat(1,nC).cuda())
+        coord_mask = Variable(coord_mask)
+        conf_mask  = Variable(conf_mask.sqrt())
+        cls_mask   = Variable(cls_mask.view(-1, 1).repeat(1,nC))
         cls        = cls[cls_mask].view(-1, nC)
 
         loss_x = self.coord_scale * nn.MSELoss(size_average=False)(x*coord_mask, tx*coord_mask)/2.0
@@ -285,7 +285,7 @@ class TinyYoloNet(nn.Module):
         self.num_anchors = len(self.anchors)/2
         self.num_output = (5+self.num_classes)*self.num_anchors
 
-        self.loss = RegionLoss(self.num_classes, self.anchors, self.num_anchors)
+        self.loss = RegionLoss(self.num_classes, self.anchors, self.num_anchors) # type: ignore
         self.cnn = nn.Sequential(OrderedDict([
             # conv1
             ('conv1', nn.Conv2d(3, 16, 3, 1, 1, bias=False)),
@@ -372,7 +372,7 @@ class TinyYoloNet(nn.Module):
 def tinyYolo():
     m = TinyYoloNet()
     m.float()
-    m.load_weights('/home/odroid/ANS/models/yolov2-tiny-voc.weights')
+    m.load_weights('models\\yolov2-tiny-voc.weights')
     return m
 
 
@@ -384,16 +384,13 @@ if __name__ == '__main__':
     m.eval()
     # print(m)
     
-    use_cuda = 0
-    if use_cuda:
-        m.cuda()
     m.to(torch.device("cpu"))
 
-    img = Image.open('Golden_Retriever_Hund_Dog.jpg').convert('RGB')
+    img = Image.open('models\\Golden_Retriever_Hund_Dog.jpg').convert('RGB')
     sized = img.resize((416, 416))
 
-    boxes = do_detect(m, sized, 0.5, 0.5, use_cuda)
+    boxes = do_detect(m, sized, 0.5, 0.5, 0)
 
-    class_names = load_class_names('voc.names')
+    class_names = load_class_names('models\\voc.names')
     plot_boxes(img, boxes, 'predict1.jpg', class_names)  
 
